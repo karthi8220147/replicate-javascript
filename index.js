@@ -1,5 +1,5 @@
 const ApiError = require('./lib/error');
-const { withAutomaticRetries } = require('./lib/util');
+const { withAutomaticRetries, parsePredictionProgress } = require('./lib/util');
 
 const collections = require('./lib/collections');
 const deployments = require('./lib/deployments');
@@ -89,11 +89,11 @@ class Replicate {
    * @param {string} [options.webhook] - An HTTPS URL for receiving a webhook when the prediction has new output
    * @param {string[]} [options.webhook_events_filter] - You can change which events trigger webhook requests by specifying webhook events (`start`|`output`|`logs`|`completed`)
    * @param {AbortSignal} [options.signal] - AbortSignal to cancel the prediction
-   * @param {Function} [progress] - Callback function that receives the prediction object as it's updated. The function is called when the prediction is created, each time its updated while polling for completion, and when it's completed.
+   * @param {Function} [callback] - Callback function that receives the prediction object as it's updated. The function is called when the prediction is created, each time its updated while polling for completion, and when it's completed.
    * @throws {Error} If the prediction failed
    * @returns {Promise<object>} - Resolves with the output of running the model
    */
-  async run(identifier, options, progress) {
+  async run(identifier, options, callback) {
     const { wait, ...data } = options;
 
     // Define a pattern for owner and model names that allows
@@ -121,17 +121,17 @@ class Replicate {
       version,
     });
 
-    // Call progress callback with the initial prediction object
-    if (progress) {
-      progress(prediction);
+    // Call callback with the initial prediction object
+    if (callback) {
+      callback(prediction, prediction && parsePredictionProgress(prediction.logs));
     }
 
     const { signal } = options;
 
-    prediction = await this.wait(prediction, wait || {}, async (updatedPrediction) => {
-      // Call progress callback with the updated prediction object
-      if (progress) {
-        progress(updatedPrediction);
+    prediction = await this.wait(prediction, wait || {}, async (updatedPrediction, progress) => {
+      // Call callback with the updated prediction object
+      if (callback) {
+        callback(updatedPrediction, progress);
       }
 
       if (signal && signal.aborted) {
@@ -142,9 +142,9 @@ class Replicate {
       return false; // continue polling
     });
 
-    // Call progress callback with the completed prediction object
-    if (progress) {
-      progress(prediction);
+    // Call callback with the completed prediction object
+    if (callback) {
+      callback(prediction, prediction && parsePredictionProgress(prediction.logs));
     }
 
     if (prediction.status === 'failed') {
@@ -256,7 +256,7 @@ class Replicate {
    * @param {object} prediction - Prediction object
    * @param {object} options - Options
    * @param {number} [options.interval] - Polling interval in milliseconds. Defaults to 500
-   * @param {Function} [stop] - Async callback function that is called after each polling attempt. Receives the prediction object as an argument. Return false to cancel polling.
+   * @param {Function} [stop] - Async callback function that is called after each polling attempt. Receives the prediction object and progress as arguments. Return false to cancel polling.
    * @throws {Error} If the prediction doesn't complete within the maximum number of attempts
    * @throws {Error} If the prediction failed
    * @returns {Promise<object>} Resolves with the completed prediction object
@@ -288,7 +288,7 @@ class Replicate {
       updatedPrediction.status !== 'canceled'
     ) {
       /* eslint-disable no-await-in-loop */
-      if (stop && await stop(updatedPrediction) === true) {
+      if (stop && await stop(updatedPrediction, updatedPrediction && parsePredictionProgress(updatedPrediction.logs)) === true) {
         break;
       }
 

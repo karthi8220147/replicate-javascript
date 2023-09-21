@@ -628,21 +628,49 @@ describe('Replicate client', () => {
         .reply(201, {
           id: 'ufawqhfynnddngldkgtslldrkq',
           status: 'starting',
+          logs: null,
         })
         .get('/predictions/ufawqhfynnddngldkgtslldrkq')
-        .twice()
         .reply(200, {
           id: 'ufawqhfynnddngldkgtslldrkq',
           status: 'processing',
+          logs: [
+            "Using seed: 12345",
+            "0%|          | 0/5 [00:00<?, ?it/s]",
+            "20%|██        | 1/5 [00:00<00:01, 21.38it/s]",
+            "40%|████▍     | 2/5 [00:01<00:01, 22.46it/s]",
+          ].join("\n"),
+        })
+        .get('/predictions/ufawqhfynnddngldkgtslldrkq')
+        .reply(200, {
+          id: 'ufawqhfynnddngldkgtslldrkq',
+          status: 'processing',
+          logs: [
+            "Using seed: 12345",
+            "0%|          | 0/5 [00:00<?, ?it/s]",
+            "20%|██        | 1/5 [00:00<00:01, 21.38it/s]",
+            "40%|████▍     | 2/5 [00:01<00:01, 22.46it/s]",
+            "60%|████▍     | 3/5 [00:01<00:01, 22.46it/s]",
+            "80%|████████  | 4/5 [00:01<00:00, 22.86it/s]",
+          ].join("\n"),
         })
         .get('/predictions/ufawqhfynnddngldkgtslldrkq')
         .reply(200, {
           id: 'ufawqhfynnddngldkgtslldrkq',
           status: 'succeeded',
           output: 'Goodbye!',
+          logs: [
+            "Using seed: 12345",
+            "0%|          | 0/5 [00:00<?, ?it/s]",
+            "20%|██        | 1/5 [00:00<00:01, 21.38it/s]",
+            "40%|████▍     | 2/5 [00:01<00:01, 22.46it/s]",
+            "60%|████▍     | 3/5 [00:01<00:01, 22.46it/s]",
+            "80%|████████  | 4/5 [00:01<00:00, 22.86it/s]",
+            "100%|██████████| 5/5 [00:02<00:00, 22.26it/s]",
+          ].join("\n"),
         });
 
-      const progress = jest.fn();
+      const callback = jest.fn();
 
       const output = await client.run(
         'owner/model:5c7d5dc6dd8bf75c1acaa8565735e7986bc5b66206b55cca93cb72c9bf15ccaa',
@@ -650,33 +678,49 @@ describe('Replicate client', () => {
           input: { text: 'Hello, world!' },
           wait: { interval: 1 }
         },
-        progress
+        callback
       );
 
       expect(output).toBe('Goodbye!');
 
-      expect(progress).toHaveBeenNthCalledWith(1, {
+      expect(callback).toHaveBeenNthCalledWith(1, {
         id: 'ufawqhfynnddngldkgtslldrkq',
         status: 'starting',
-      });
+        logs: null,
+      }, null);
 
-      expect(progress).toHaveBeenNthCalledWith(2, {
+      expect(callback).toHaveBeenNthCalledWith(2, {
         id: 'ufawqhfynnddngldkgtslldrkq',
         status: 'processing',
+        logs: expect.any(String),
+      }, {
+        percentage: 0.4,
+        current: 2,
+        total: 5,
       });
 
-      expect(progress).toHaveBeenNthCalledWith(3, {
+      expect(callback).toHaveBeenNthCalledWith(3, {
         id: 'ufawqhfynnddngldkgtslldrkq',
         status: 'processing',
+        logs: expect.any(String),
+      }, {
+        percentage: 0.8,
+        current: 4,
+        total: 5,
       });
 
-      expect(progress).toHaveBeenNthCalledWith(4, {
+      expect(callback).toHaveBeenNthCalledWith(4, {
         id: 'ufawqhfynnddngldkgtslldrkq',
         status: 'succeeded',
+        logs: expect.any(String),
         output: 'Goodbye!',
+      }, {
+        percentage: 1.0,
+        current: 5,
+        total: 5,
       });
 
-      expect(progress).toHaveBeenCalledTimes(4);
+      expect(callback).toHaveBeenCalledTimes(4);
     });
 
     test('Does not throw an error for identifier containing hyphen and full stop', async () => {
