@@ -15,6 +15,21 @@ declare module "replicate" {
     models?: Model[];
   }
 
+  export interface FileObject {
+    id: string;
+    name: string;
+    content_type: string;
+    size: number;
+    etag: string;
+    checksum: string;
+    metadata: Record<string, any>;
+    created_at: string;
+    expires_at: string | null;
+    urls: {
+      get: string;
+    };
+  }
+
   export interface Hardware {
     sku: string;
     name: string;
@@ -158,6 +173,16 @@ declare module "replicate" {
           }
         ): Promise<Prediction>;
       };
+    };
+
+    files: {
+      create: (
+        file: File | Blob,
+        metadata?: Record<string, string | number | boolean | null>
+      ) => Promise<FileObject>;
+      list: () => Promise<FileObject>;
+      get: (file_id: string) => Promise<FileObject>;
+      delete: (file_id: string) => Promise<FileObject>;
     };
 
     hardware: {
