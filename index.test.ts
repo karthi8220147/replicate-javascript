@@ -1,5 +1,5 @@
 import { expect, jest, test } from "@jest/globals";
-import Replicate, { ApiError, Model, Prediction } from "replicate";
+import Replicate, { ApiError, Model, Prediction } from "./";
 import nock from "nock";
 import fetch from "cross-fetch";
 
@@ -838,7 +838,6 @@ describe("Replicate client", () => {
     });
 
     test("Calls the correct API routes for a model", async () => {
-      const firstPollingRequest = true;
 
       nock(BASE_URL)
         .post("/models/replicate/hello-world/predictions")
